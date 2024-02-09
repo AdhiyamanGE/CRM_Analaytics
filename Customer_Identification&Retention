@@ -1,0 +1,150 @@
+!pip install plotly
+!pip install Lifetimes
+
+import os
+import datetime
+import warnings
+import pandas as pd
+import numpy as np
+import datetime as dt
+from operator import attrgetter
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import plotly.graph_objs as go
+
+from plotly.offline import iplot
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import (silhouette_score,
+                             calinski_harabasz_score,
+                             davies_bouldin_score)
+from lifetimes import BetaGeoFitter, GammaGammaFitter
+from lifetimes.plotting import plot_period_transactions
+df=pd.read_csv('./data.csv',encoding='unicode_escape',parse_dates=['InvoiceDate'],dtype={'CustomerID':str,'InvoiceID':str})
+df.head()
+
+def replace_with_thresholds(dataframe, variable, q1 = 0.25, q3 = 0.75):
+
+    '''
+    Detects outliers with IQR method and replaces with thresholds
+
+    '''
+
+    df_ = dataframe.copy()
+    quartile1 = df_[variable].quantile(q1)
+    quartile3 = df_[variable].quantile(q3)
+    iqr = quartile3 - quartile1
+
+    up_limit = quartile3 + 1.5 * iqr
+    low_limit = quartile1 - 1.5 * iqr
+    df_.loc[(df_[variable] < low_limit), variable] = low_limit
+    df_.loc[(df_[variable] > up_limit), variable] = up_limit
+
+    return df_
+
+def ecommerce_preprocess(dataframe):
+  df_ = dataframe.copy()
+  df_ = df_.dropna()#Missing Values
+  df_ = df_[~df_['InvoiceNo'].str.contains('C', na = False)] #Cancelled Orders & Quantity
+  df_ = df_[df_['Quantity'] > 0] #Cancelled Orders & Quantity
+  df_ = replace_with_thresholds(df_, "Quantity", q1 = 0.01, q3 = 0.99)#Replacing Outliers
+  df_ = replace_with_thresholds(df_, "UnitPrice", q1 = 0.01, q3 = 0.99)#Replacing Outliers
+  df_["TotalPrice"] = df_["Quantity"] * df_["UnitPrice"]#Total Price
+  return df_
+
+df = ecommerce_preprocess(df)
+df.head()
+
+today_date = dt.datetime(2023,12,21)
+
+rfm = df.groupby('CustomerID').agg({'InvoiceDate': lambda x: (today_date - x.max()).days,
+                                    'InvoiceNo': lambda x: x.nunique(),
+                                    'TotalPrice': lambda x: x.sum()})
+
+rfm.columns = ['recency', 'frequency', 'monetary']
+rfm['monetary'] = rfm['monetary'].fillna(0)
+rfm = rfm.reset_index()
+
+print(rfm)
+
+# Scale the data
+rfmi=rfm.copy()
+scaler = MinMaxScaler()
+rfmi[['recency', 'frequency', 'monetary']] = scaler.fit_transform(rfmi[['recency', 'frequency', 'monetary']])
+# Create a list of possible cluster counts
+cluster_counts = range(3, 11)
+
+# Calculate the silhouette coefficient for each cluster count
+silhouette_scores = []
+for cluster_count in cluster_counts:
+    kmeans = KMeans(n_clusters=cluster_count)
+    kmeans.fit(rfmi[['recency', 'frequency', 'monetary']])
+    silhouette_scores.append(silhouette_score(rfmi[['recency', 'frequency', 'monetary']], kmeans.labels_))
+
+# Find the cluster count that maximizes the silhouette coefficient
+optimal_cluster_count = cluster_counts[np.argmax(silhouette_scores)]
+
+# Cluster the customers using the optimal cluster count
+kmeans = KMeans(n_clusters=optimal_cluster_count)
+kmeans.fit(rfmi[['recency', 'frequency', 'monetary']])
+
+# Add the cluster labels to the DataFrame
+rfmi['cluster'] = kmeans.labels_
+
+print(rfmi.groupby('cluster').size())
+plt.scatter(rfmi['recency'], rfmi['frequency'], c=rfmi['cluster'], cmap='viridis')
+plt.xlabel('Recency')
+plt.ylabel('Frequency')
+plt.show()
+print(rfm)
+
+!pip install lifetimes
+from lifetimes import BetaGeoFitter
+from lifetimes.plotting import plot_frequency_recency_matrix,plot_probability_alive_matrix
+
+today_date = dt.datetime(2011,12,23)
+cltv_df=df.groupby("CustomerID").agg(
+    {
+        'InvoiceDate' :[
+            lambda x:(x.max()-x.min()).days,
+            lambda x:(today_date-x.min()).days,
+        ],
+        'InvoiceNo':'nunique',
+        'TotalPrice':'sum',
+    }
+)
+cltv_df.columns = cltv_df.columns.droplevel(0)
+cltv_df.columns = ["recency", "T", "frequency", "monetary"]
+cltv_df.head()
+
+cltv_df["monetary"] = cltv_df["monetary"] / cltv_df["frequency"]
+
+#Recency & Tenure
+cltv_df["recency"] = cltv_df["recency"] / 7
+cltv_df["T"] = cltv_df["T"] / 7
+
+#Frequency
+cltv_df = cltv_df[(cltv_df['frequency'] > 1)]
+
+BGF = BetaGeoFitter(penalizer_coef=0.001)  # avoid overfitting
+
+BGF.fit(cltv_df["frequency"], cltv_df["recency"], cltv_df["T"])
+
+BGF.conditional_expected_number_of_purchases_up_to_time(
+    4, cltv_df["frequency"], cltv_df["recency"], cltv_df["T"]
+).sort_values(ascending=False).head(10).to_frame(
+    "Expected Number of Transactions"
+).reset_index()
+
+cltv_df["probability_alive"] = BGF.conditional_probability_alive(
+    cltv_df["frequency"], cltv_df["recency"], cltv_df["T"]
+)
+
+plt.figure(figsize=(10, 6))
+plt.hist(cltv_df["probability_alive"], bins=30, color='blue', alpha=0.7)
+plt.title('Distribution of Probability of Being Alive')
+plt.xlabel('Probability of Being Alive')
+plt.ylabel('Number of Customers')
+plt.show()
+

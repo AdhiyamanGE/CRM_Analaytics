@@ -1,5 +1,6 @@
 
 1.Customer Identification & Segmentation:
+
 ->Dataset taken from kaggle is used.
 
 attributes : InvoiceNO,StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country.
@@ -7,6 +8,7 @@ attributes : InvoiceNO,StockCode,Description,Quantity,InvoiceDate,UnitPrice,Cust
 ![data](https://github.com/AdhiyamanGE/CRM_Analaytics/assets/54020582/c989b0a7-6ce9-491b-9490-56b07360e2a2)
 
 ->RFM metric is calculated.
+
 RECENCY : How recently a customer has made a transaction.
 
 FREQUENCY : How frequently a customer had transactions.

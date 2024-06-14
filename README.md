@@ -1,6 +1,7 @@
 
 1.Customer Identification & Segmentation:
 ->Dataset taken from kaggle is used.
+
 attributes : InvoiceNO,StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country.
 
 ![data](https://github.com/AdhiyamanGE/CRM_Analaytics/assets/54020582/c989b0a7-6ce9-491b-9490-56b07360e2a2)

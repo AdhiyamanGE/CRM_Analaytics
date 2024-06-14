@@ -8,12 +8,15 @@ attributes : InvoiceNO,StockCode,Description,Quantity,InvoiceDate,UnitPrice,Cust
 
 ->RFM metric is calculated.
 RECENCY : How recently a customer has made a transaction.
+
 FREQUENCY : How frequently a customer had transactions.
+
 MONETARY : Total amount spent by the customer
 
 ![RFM](https://github.com/AdhiyamanGE/CRM_Analaytics/assets/54020582/e10759c1-1f58-499f-b6c1-77d802c2d9bc)
 
 ->Using K-means algorithm,Clusters are formed based on the rfm metric computed above.
+
 ->These clusters can be interpreted by analysts to segment the customers in different categories and allocate different buisness strategies for each segment.
 
 ![Recency V Frequency](https://github.com/AdhiyamanGE/CRM_Analaytics/assets/54020582/80a46fb5-88cc-4b53-aec9-90bbbbd559b1)
